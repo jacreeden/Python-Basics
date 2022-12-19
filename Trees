@@ -1,0 +1,520 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jun 17 11:44:04 2022
+
+@author: 15409
+"""
+
+
+# my_tree = ['a', #root 
+#            ['b', #left subtree 
+#             ['d' [], []],
+#             ['e' [], []] ],
+#            ['c', #right subtree
+#             ['f' [], []], [] ] 
+#            ]
+
+# my_tree = ['a', ['b', ['d',[],[]], ['e',[],[]] ], ['c', ['f',[],[]], []] ]
+# print(my_tree)
+# print('left subtree = ', my_tree[1])
+# print('root = ', my_tree[0])
+# print('right subtree = ', my_tree[2])
+
+# def binary_tree(r):
+# #The binary_tree function simply constructs a list with a root node and two empty sublists for the children
+#     return[r,[],[]]
+
+# def insert_left(root,new_branch):
+#     #Notice that to insert a left child, we first obtain the (possibly empty) list that corresponds to the
+#     #current left child. We then add the new left child, installing the old left child as the left child
+#     #of the new one.
+#     t = root.pop(1)
+#     #removes the left part of the binary tree list
+#     if len(t) > 1:
+#         root.insert(1, [new_branch,t,[]])
+#     else:
+#         root.insert(1, [new_branch,[],[]])
+#     return root
+
+# def insert_right(root, new_branch):
+#     t = root.pop(2)
+#     #removes the right most section of the tree to replace
+#     if len(t) > 1:
+#         root.insert(2, [new_branch, [], t])
+#     else:
+#         root.insert(2, [new_branch,[],[]])
+#     return root
+
+
+# def get_root_val(root):
+#     return root[0]
+
+# def set_root_val(root,new_val):
+#     root[0] = new_val
+
+# def get_left_child(root):
+#     return root[1]
+
+# def get_right_child(root):
+#     return root[2]
+
+
+# r = binary_tree(3)
+# insert_left(r, 4)
+# insert_left(r, 5)
+# insert_right(r, 6)
+# insert_right(r, 7)
+# l = get_left_child(r)
+# print(l)
+# set_root_val(l, 9)
+# print(r)
+# insert_left(l, 11)
+# print(r)
+
+# print(get_right_child(get_right_child(r)))
+
+# def build_tree(a,b,c,d,e,f):
+#     a= str(a)
+#     b= str(b)
+#     c= str(c)
+#     d= str(d)
+#     e= str(e)
+#     f= str(f)
+#     r = binary_tree(a)
+
+#     insert_left(r, b)
+#     insert_right(r, c)
+#     l = get_left_child(r)
+#     k = get_right_child(r)
+#     insert_right(l, d)
+#     insert_left(k, e)
+#     insert_right(k, f)
+#     print(r)
+    
+# build_tree("a", "b", "c", "d", "e", "f")
+
+
+# class BinaryTree:
+#     def __init__(self, root):
+#         self.key = root
+#         self.left_child = None
+#         self.right_child = None
+        
+#     def insert_left(self, new_node):
+#         if self.left_child == None:
+#             self.left_child = BinaryTree(new_node)
+#             #When there is no left child, simply add a node to the tree.
+#         else:
+#             t = BinaryTree(new_node)
+#             t.left_child = self.left_child
+#             self.left_child = t
+#             #The second caseis characterized by a node with an existing left child. 
+#             #In the second case, we insert a node and
+#             #push the existing child down one level in the tree.
+            
+    
+#     def insert_right(self,new_node):
+#         if self.right_child == None:
+#             self.right_child = BinaryTree(new_node)
+#         else:
+#             t = BinaryTree(new_node)
+#             t.right_child = self.right_child
+#             self.right_child = t
+    
+#     def get_right_child(self):
+#         return self.right_child
+    
+#     def get_left_child(self):
+#         return self.left_child
+    
+#     def set_root_val(self,obj):
+#         self.key = obj
+    
+#     def get_root_val(self):
+#         return self.key
+
+
+# r = BinaryTree('a')
+# print(r.get_root_val())
+# print(r.get_left_child())
+# r.insert_left('b')
+# print(r.get_left_child())
+# print(r.get_left_child().get_root_val())
+# r.insert_right('c')
+# print(r.get_right_child())
+# print(r.get_right_child().get_root_val())
+# r.get_right_child().set_root_val('hello')
+# print(r.get_right_child().get_root_val())
+
+# class BinHeap:
+#     def __init__(self):
+#         self.heap_list = [0]
+#         self.current_size = 0
+#         #attribute current_size to keep track of the current size of the heap. Below we show
+#         #the Python code for the constructor. You will notice that an empty binary heap has a single
+#         #zero as the first element of heap_list and that this zero is not used, but is there so that simple#
+#         #integer division can be used in later methods.
+        
+#     def perc_up (self,i):
+#         while i // 2 > 0:
+#             if self.help_list[i] < self.heap_list[i//2]:
+#                 #if the current spot i  in the heap is less than the i//2 (next spot up) then they need to switch
+#                 tmp = self.heap_list[i//2]
+#                 self.heap_list[i//2] = self.heap_list[i]
+#                 self.heap_list[i] = tmp
+#                 #reassigining values of i and I//2 locations 
+#             i= i // 2
+#             #repeat for the next step up until you get to the root at 0
+#     def insert(self, k):
+#         self.heap_list.append(k)
+#         self.current_size = self.current_size + 1
+#         self.perc_up(self.current_size)
+#         # use current size to give the location on the newly added number
+        
+#     def perc_down(self, i):
+#         while (i*2) <= self.current_size:
+#             # if i*2 is greater than the current size then you know you are at the end of the heap and there is nothing to compare to.
+#             mc = self.minchild(i)
+#             if self.heap_list[i] > self.heap_list[mc]:
+#                 # take the minimum of the children below and comparie it to the current location and if it is larger than it then it needs to go down to the mc loaction
+#                 # this is so when you are moving down you are always swapping the minimum child up and the 
+#                 #larger is moving down to that new position previously held by mc.
+#                 tmp = self.heap_list[i]
+#                 self.heap_list[i] = self.heap_list[mc]
+#                 self.heap_list[mc] = tmp
+#             i = mc
+#             #now I is MC since they swapped
+
+                
+#     def min_child(self, i):
+#         if i * 2 + 1 > self.current_size:
+#             #THIS IS TO MAKE SURE AT THE LAST LEVEL YOU WILL COMPARE TO NOTHING IF NOTHING IS ON THE RIGHT SIDE SO IT HAS TO BE THE LEFT BRANCH
+#             return i * 2
+#         elif self.heap_list[i * 2] < self.heap_list[i * 2 + 1]:
+#             # THIS COMPARES THE TWO EXISTING BRANChES BELOW THE CURRENT i SPOT SINCE 
+#             #WHATEVER POSITION SAY 1 HAS POSITIONS 2 AND 3 (2 has 4 and 5) BELOW IT AND YOU WNAT TO FIND THE LOWEST VALUE
+#             #TO SELECT OS IF LESS THAN CHOOSE i*2 OTHERWISE CHOOSE i*2 + 1 SINCE IT MUST BE THE LOWESt 
+#             #IF i*2 ISNT 
+#             return i * 2
+#         else:
+#             return i * 2 + 1
+    
+#     def del_min(self):
+#         ret_val = self.heap_list[1]
+#         self.heap_list[1] = self.heap_list[self.current_size]
+#         # MOVES LAST VALUE (CURRENT SIZE TO THE TOP AND PUTS IT IN THE [1] POSITION
+#         self.current_size = self.current_size - 1
+#         self.heap_list.pop()
+#         # DOWN SIZE THE HEAP BY 1 AND REMOVE THE [1] VALUE SO THE NEW [1] VALUE BECOME THE [1] IS ALL DONE CONCURRENTLY THANKS TO PYTHON
+#         self.perc_down(1)
+#         return ret_val
+    
+#     def build_heap(self, a_list):
+#         i = len(a_list) // 2
+#         self.current_size = len(a_list)
+#         self.heap_list = [0] + a_list[:]
+#         while (i > 0):
+#             self.perc_down(i)
+#             i = i - 1
+
+
+
+
+
+# class Stack:
+#     def __init__(self):
+#         self.items = []
+#     def is_empty(self):
+#         return self.items == []
+#     def push(self, item):
+#         self.items.insert(0, item)
+#     def pop(self):
+#         return self.items.pop(0)
+#     def peek(self):
+#         return self.items[0]
+#     def size(self):
+#         return len(self.items)
+
+# class BinaryTree:
+#     def __init__(self, root):
+#         self.key = root
+#         self.left_child = None
+#         self.right_child = None
+        
+#     def insert_left(self, new_node):
+#         if self.left_child == None:
+#             self.left_child = BinaryTree(new_node)
+#             #When there is no left child, simply add a node to the tree.
+#         else:
+#             t = BinaryTree(new_node)
+#             t.left_child = self.left_child
+#             self.left_child = t
+#             #The second caseis characterized by a node with an existing left child. 
+#             #In the second case, we insert a node and
+#             #push the existing child down one level in the tree.
+            
+    
+#     def insert_right(self,new_node):
+#         if self.right_child == None:
+#             self.right_child = BinaryTree(new_node)
+#         else:
+#             t = BinaryTree(new_node)
+#             t.right_child = self.right_child
+#             self.right_child = t
+    
+#     def get_right_child(self):
+#         return self.right_child
+    
+#     def get_left_child(self):
+#         return self.left_child
+    
+#     def set_root_val(self,obj):
+#         self.key = obj
+    
+#     def get_root_val(self):
+#         return self.key
+
+
+# def build_parse_tree(fp_exp):
+#     fp_list = fp_exp.split()
+#     p_stack = Stack()
+#     #makes a stack
+#     e_tree = BinaryTree('')
+#     # e tree starts a empy binary tree
+#     p_stack.push(e_tree)
+#     #add the first empty root node in the e_tree
+#     current_tree = e_tree
+#     #current tree is set to the current node
+#     for i  in fp_list:
+#         # if i is the left paren then you insert a node and create a left child
+#         if i == '(':
+#             current_tree.insert_left('')
+#             p_stack.push(current_tree)
+#             current_tree = current_tree.get_left_child()
+#         #if the value is not one of the operators then it gets inserted into the root value and the newly made value
+#         #then popped and the root tree is set to the parent
+#         elif i not in  ['+', '-', '*', '/', ')']:
+#             current_tree.set_root_val(int(i))
+#             p_stack.pop
+#             current_tree = current_tree.get_root_val()
+#         elif i in ['+', '-', '*', '/', ')']:
+#             # if the value is an operator then the root vlaue will be set to the operand and then 
+#             #a right child is made and the current location of the tree is set to the new right child
+#             current_tree.set_root_val(i)
+#             current_tree.insert_right('')
+#             p_stack.push(current_tree)
+#             current_tree = current_tree.get_right_child()
+#         elif i == ')':
+#             current_tree = p_stack.pop()
+#         else:
+#             raise ValueError
+#     return e_tree
+
+# pt = build_parse_tree("( ( 10 + 5 ) * 3 )")
+
+
+class BinarySearchTree:
+    def __init__(self):
+        self.root = None
+        self.size = 0
+    def length(self):
+        return self.size
+    def __len__(self):
+        return self.size
+    def __iter__(self):
+        return self.root.__iter__()
+    
+class TreeNode:
+    def __init__(self, key, val, left = None, right = None, parent =
+    None):
+        self.key = key
+        self.payload = val
+        self.left_child = left
+        self.right_child = right
+        self.parent = parent
+    def has_left_child(self):
+        return self.left_child
+    def has_right_child(self):
+        return self.right_child
+    def is_left_child(self):
+        return self.parent and self.parent.left_child == self
+    def is_right_child(self):
+        return self.parent and self.parent.right_child == self
+    def is_root(self):
+        return not self.parent
+    def is_leaf(self):
+        return not (self.right_child or self.left_child)
+    def has_any_children(self):
+        return self.right_child or self.left_child
+    def has_both_children(self):
+        return self.right_child and self.left_child
+    def replace_node_data(self, key, value, lc, rc):
+        self.key = key
+        self.payload = value
+        self.left_child = lc
+        self.right_child = rc
+        if self.has_left_child():
+            self.left_child.parent = self
+        if self.has_right_child():
+            self.right_child.parent = self
+
+class BinarySearchTree:
+    def __init__(self):
+        self.root = None
+        self.size = 0
+    def length(self):
+        return self.size
+    def __len__(self):
+        return self.size
+    def put(self, key, val):
+        if self.root:
+            self._put(key, val, self.root)
+        else:
+            self.root = TreeNode(key,val)
+            self.size = self.size + 1
+    def _put(self, key, val, current_node):
+        if key < current_node.key:
+            if current_node.has_left_child():
+                self._put(key, val, current_node.left_child)
+            else:
+                current_node.left_child = TreeNode(key, val, parent =
+                                                   current_node)
+        else:
+            if current_node.has_right_child():
+                self._put(key, val, current_node.right_child)
+            else:
+                current_node.right_child = TreeNode(key, val, parent = current_node)
+
+    def __setitem__(self, k, v):
+        self.put(k, v)
+    def get(self, key):
+        if self.root:
+            res = self._get(key, self.root)
+            if res:
+                return res.payload
+            else:
+                return None
+        else:
+            return None
+    def _get(self, key, current_node):
+        if not current_node:
+            return None
+        elif current_node.key == key:
+            return current_node
+        elif key < current_node.key:
+            return self._get(key, current_node.left_child)
+        else:
+            return self._get(key, current_node.right_child)
+                
+    def __getitem__(self, key):
+        return self.get(key)
+
+    def __contains__(self, key):
+        if self._get(key, self.root):
+            return True
+        else:
+            return False
+
+
+    def delete(self, key):
+        if self.size > 1:
+            node_to_remove = self._get(key, self.root)
+            if node_to_remove:
+                self.remove(node_to_remove)
+                self.size = self.size - 1
+            else:
+                raise KeyError('Error, key not in tree')
+        elif self.size == 1 and self.root.key == key:
+            self.root = None
+            self.size = self.size - 1
+        else:
+            raise KeyError('Error, key not in tree')
+
+    def __delitem__(self, key):
+        self.delete(key)
+    
+    def splice_out(self):
+        if self.is_leaf():
+            if self.is_left_child():
+                self.parent.left_child = None
+            else:
+                self.parent.right_child = None
+        elif self.has_any_children():
+            if self.has_left_child():
+                if self.is_left_child():
+                    self.parent.left_child = self.left_child
+                else:
+                    self.parent.right_child = self.left_child
+                    self.left_child.parent = self.parent
+            else:
+                if self.is_left_child():
+                    self.parent.left_child = self.right_child
+                else:
+                    self.parent.right_child = self.right_child
+                    self.right_child.parent = self.parent
+        
+    def find_successor(self):
+        succ = None
+        if self.has_right_child():
+            succ = self.right_child.find_min()
+        else:
+            if self.parent:
+                if self.is_left_child():
+                    succ = self.parent
+                else:
+                    self.parent.right_child = None
+                    succ = self.parent.find_successor()
+                    self.parent.right_child = self
+        return succ
+
+def find_min(self):
+    current = self
+    while current.has_left_child():
+        current = current.left_child
+    return current
+
+    def remove(self, current_node):
+        if current_node.is_leaf(): #leaf
+            if current_node == current_node.parent.left_child:
+                current_node.parent.left_child = None
+            else:
+                current_node.parent.right_child = None
+        elif current_node.has_both_children(): # interior
+            succ = current_node.find_successor()
+            succ.splice_out()
+            current_node.key = succ.key
+            current_node.payload = succ.payload
+        else: # this node has one child
+            if current_node.has_left_child():
+                if current_node.is_left_child():
+                    current_node.left_child.parent = current_node.parent
+                    current_node.parent.left_child = current_node.left_child
+                elif current_node.is_right_child():
+                    current_node.left_child.parent = current_node.parent
+                    current_node.parent.right_child = current_node.left_child
+                else:
+                    current_node.replace_node_data(current_node.left_child.key,
+                    current_node.left_child.payload,
+                    current_node.left_child.left_child,
+                    current_node.left_child.right_child)
+            else:
+                if current_node.is_left_child():
+                    current_node.right_child.parent = current_node.parent
+                    current_node.parent.left_child = current_node.right_child
+                elif current_node.is_right_child():
+                    current_node.right_child.parent = current_node.parent
+                    current_node.parent.right_child = current_node.right_child
+                else:
+                    current_node.replace_node_data(current_node.right_child.key,
+                                                   current_node.right_child.payload,
+                                                   current_node.right_child.left_child,
+                                                   current_node.right_child.right_child)
+
+
+my_tree = BinarySearchTree()
+my_tree[3] = "red"
+my_tree[4] = "blue"
+my_tree[6] = "yellow"
+my_tree[2] = "at"
+print(my_tree[6])
+print(my_tree[2])
