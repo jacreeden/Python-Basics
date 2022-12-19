@@ -1,0 +1,1065 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jun 22 15:23:44 2022
+
+@author: 15409
+"""
+
+# Python ≥3.5 is required
+import sys
+assert sys.version_info >= (3, 5)
+
+# Scikit-Learn ≥0.20 is required
+import sklearn
+assert sklearn.__version__ >= "0.20"
+
+# Common imports
+import numpy as np
+import os
+import pandas as pd 
+import os
+import tarfile
+import urllib.request
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
+# To plot pretty figures
+#matplotlib inline
+mpl.rc('axes', labelsize=14)
+mpl.rc('xtick', labelsize=12)
+mpl.rc('ytick', labelsize=12)
+
+# Where to save the figures
+PROJECT_ROOT_DIR = "."
+CHAPTER_ID = "end_to_end_project"
+IMAGES_PATH = os.path.join(PROJECT_ROOT_DIR, "images", CHAPTER_ID)
+os.makedirs(IMAGES_PATH, exist_ok=True)
+
+def save_fig(fig_id, tight_layout=True, fig_extension="png", resolution=300):
+    path = os.path.join(IMAGES_PATH, fig_id + "." + fig_extension)
+    print("Saving figure", fig_id)
+    if tight_layout:
+        plt.tight_layout()
+    plt.savefig(path, format=fig_extension, dpi=resolution)
+
+
+
+# Function to pull the data
+
+DOWNLOAD_ROOT = "https://raw.githubusercontent.com/ageron/handson-ml2/master/"
+HOUSING_PATH = os.path.join("datasets","housing")
+HOUSING_URL = DOWNLOAD_ROOT + "datasets/housing/housing.tgz"
+#%%
+def fetch_housing_data(housing_url=HOUSING_URL, housing_path=HOUSING_PATH):
+    #make a function to fetch the housing data that uses the jousing URL and path
+    if not os.path.isdir(housing_path):
+        os.makedirs(housing_path)
+    tgz_path = os.path.join(housing_path, "housing.tgz")
+    #grabs the data in the file name
+    urllib.request.urlretrieve(housing_url, tgz_path)
+    housing_tgz = tarfile.open(tgz_path)
+    housing_tgz.extractall(path=housing_path)
+    housing_tgz.close()
+    
+fetch_housing_data()
+
+#returns pandas dataframe obj with all the data
+def load_housing_data(housing_path=HOUSING_PATH):
+    csv_path = os.path.join(housing_path, "housing.csv")
+    return pd.read_csv(csv_path)
+
+housing = load_housing_data()
+h_data_head = housing.head()
+print(housing.head())
+h_data_info = housing.info()
+print(housing.info())
+#.info gives me a quick description of the data
+print(housing["ocean_proximity"].value_counts())
+#since the ocean proximity is not a number and is an object in the data from the csv
+# it is a text object and .value_counts() lets me see the number of instances each occur
+h_data_describe= housing.describe()
+print(housing.describe())
+#this gives me a summary of each attribute column
+
+save_fig("attribute_histogram_plots")
+housing.hist(bins=50, figsize=(20,15))
+#plt.show()
+
+
+# Now we need to create a test set
+
+
+
+# to make this notebook's output identical at every run random.seed() uses the
+#For the random() function, Python uses Mersenne Twister as the core generator. 
+#It produces 53-bit precision floats and has a period of 2**19937–1. 
+#The Mersenne Twister is also one of the most extensively tested random number 
+#generators in existence. Being completely deterministic, it is not suitable for 
+#all purposes, and is completely unsuitable for cryptographic purposes. 
+
+#The seed is given an integer value to ensure that the results of pseudo-random 
+#generation are reproducible. By re-using a seed value, the same sequence should 
+#be reproducible from run to run as long as multiple threads are not running.
+np.random.seed(42)
+
+def split_train_test(data, test_ratio):
+    shuffled_indices = np.random.permutation(len(data))
+    test_set_size = int(len(data)* test_ratio)
+    test_indices = shuffled_indices[:test_set_size]
+    train_indices = shuffled_indices[test_set_size:]
+    return data.iloc[train_indices], data.iloc[test_indices]
+
+train_set, test_set = split_train_test(housing, 0.2)
+print(len(train_set))
+    
+
+# This was the other method used in the book. I personally like the one below this not commented one so I am going to use it
+# import hashlib
+# def test_set_check_2(identifier, test_ratio, hash):
+#     #The hash(np.int64(identifier)).digest() part returns a hash value of the identifier (which we cast as an int of 8 bytes with np.int64()).
+#     #The bytearray method stores the hash value into an array. The [-1] represents getting 1 byte/the last byte from the array/hash value. This byte will be a # between 0 and 255 (1 byte=11111111, or 255 in decimal).
+#     #Assuming our test_ratio is .20, the byte value should be less than or equal to 51 (256*.20=51.2). If the byte is less than or equal to 51, the row/instance will be added to the test set.
+    
+#     #when you call digest() it returns a byte array of 64 bits (8 bytes), regardless of the length of the input byte array:
+        
+#    # for the MD5 hash that's the last byte making the value fall between 0 and 255, for the CRC32 checksum the value lies between 0 and (2^32)-1. This integer is then compared to the full range; if it falls below the test_ratio * maximum cut-off point it is considered selected.
+
+        
+#     return hash(np.int64(identifier)).digest()[-1] <256 * test_ratio
+
+# def split_train_test_by_id_2(data, test_ratio, id_column, hash=hashlib.md5):
+#     #uses the md5 library with the 2 version
+#     ids = data[id_column]
+#     in_test_set = ids.apply(lambda id_: test_set_check_2(id_, test_ratio, hash))
+#     #Basically, lambda x: x+1 -> so for x do x+1 can assign lambda to do anything
+#     #Here lambda id_: test_set_check(id_, test_ratio) say for each id in data set run test_set_check
+#     return data.loc[~in_test_set], data.loc[in_test_set]
+#%%
+from zlib import crc32
+
+def test_set_check(identifier, test_ratio):
+    # returns a 32 bit number/ the 0xffffffff makes it so the number is unsigned adn compatible with python 2/3
+    # and it is less than test ratio* 2^32 due to the 32 bit size and finding the test reaio amt you selected
+    # to ~ give you that percent
+    
+    #The crc32 function outputs an unsigned 32-bit number, and the code tests if the CRC value is lower than the test_ratio times the maximum 32-bit number.
+    #The & 0xffffffff mask is there only to ensure compatibility with Python 2 and 3. In Python 2 the same function could return a signed integer, in a range from -(2^31) to (2^31) - 1, masking this with the 0xffffffff mask normalises the value to a signed.
+    #So basically, either version turns the identifier into an integer, and the hash is used to make that integer reasonably uniformly distributed in a range; 
+    return crc32(np.int64(identifier)) & 0xffffffff < test_ratio * 2**32
+
+def split_train_test_by_id(data, test_ratio, id_column):
+    ids = data[id_column]
+    in_test_set = ids.apply(lambda id_: test_set_check(id_, test_ratio))
+    #Basically, lambda x: x+1 -> so for x do x+1 can assign lambda to do anything
+    #Here lambda id_: test_set_check(id_, test_ratio) say for each id in data set run test_set_check
+    #(this is why it is important to specify index) otherwise it would hash everything
+    return data.loc[~in_test_set], data.loc[in_test_set]
+#[~in_test_set] is a bitwise NOT so it means not in [in_test_set] so everything that passes test set id check goes to test set
+#otherwise it is in training set. this nicely allows you to split the data sets between the two specified data sets
+
+#DataFrame.loc
+#Purely label-location based indexer for selection by label.
+#Series.iloc
+#Purely integer-location based indexing for selection by position.
+
+
+housing_with_id = housing.reset_index()   # adds an `index` column to the beginning of the housing data set
+train_set, test_set = split_train_test_by_id(housing_with_id, 0.2, "index") #generate the hashing in the index column as wanted
+# down side of this is since it is generated by the row iun the table no existing rows can be deleted and all new data needs to be appended to the end of the data set.
+# another approach is make an ID to hash from the longitude/latitude which will be consistenet on human timeframes
+
+housing_with_id["id"] = housing["longitude"]*1000 + housing["latitude"] #adds a cloumn "id" that is generated from the lat and long calculation
+train_set, test_set = split_train_test_by_id(housing_with_id, 0.2, "id") #generate the hashing in the index column as wanted
+ 
+print(train_set.head())
+
+from sklearn.model_selection import train_test_split
+
+train_set, test_set = train_test_split(housing, test_size=0.2,random_state=42)
+#this is basically what we did above but with the sklearn library (data set, test size, random seed stat = 42(whatever you want))
+
+print(train_set.head())
+
+housing["median_income"].hist()
+#bins the values in the median income section of the data
+
+# housing["income_cat"] = pd.cut(housing["median_income"], bins=[0, 1.5, 3.0, 4.5, 6, np.inf], labels=[1,2,3,4,5])
+
+# print(housing["income_cat"].value_counts())
+
+# housing['income_cat'].hist()
+
+housing["income_cat"] = np.ceil(housing["median_income"]/1.5)
+#divides the data into bins of 1.5
+housing["income_cat"].where(housing["income_cat"] <5, 5.0, inplace = True)
+# this makes it so the max fall into the 5 bin. inplace = True makes the last column 5
+
+housing["income_cat"].hist()
+#%%
+from sklearn.model_selection import StratifiedShuffleSplit
+
+split = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+#set up a stratified shuffled split with SK learn with the n is the number of splitting iterations and re-shuffle,
+#test size is the size of the test group can also specify train_group
+
+for train_index, test_index in split.split(housing, housing['income_cat']):
+    strat_train_set = housing.loc[train_index]
+    strat_test_set = housing.loc[test_index]
+#here we are splitting the dat set with the methods of the class
+#get_n_splits([X, y, groups])	Returns the number of splitting iterations in the cross-validator
+#split(X, y[, groups])	Generate indices to split data into training and test set.
+#using split to generate indices to split housing by the income_cat column and then using loc to put them into their respoective data sets
+
+
+print(strat_test_set["income_cat"].value_counts() / len(strat_test_set))
+
+#this plit gives a more representative to data set split than the random splitting
+#see fig 2-10 in the ML book for the table on this.
+
+print(housing["income_cat"].value_counts() / len(housing))
+
+
+def income_cat_proportions(data):
+    return data["income_cat"].value_counts() / len(data)
+
+train_set, test_set = train_test_split(housing, test_size=0.2, random_state=42)
+
+compare_props = pd.DataFrame({
+    "Overall": income_cat_proportions(housing),
+    "Stratified": income_cat_proportions(strat_test_set),
+    "Random": income_cat_proportions(test_set),
+}).sort_index()
+compare_props["Rand. %error"] = 100 * (compare_props["Random"] - compare_props["Overall"]) / compare_props["Overall"]
+compare_props["Strat. %error"] = 100 * (compare_props["Stratified"] - compare_props["Overall"])  / compare_props["Overall"]
+
+print(compare_props)
+
+for set_ in (strat_train_set, strat_test_set):
+    set_.drop("income_cat", axis = 1, inplace=True)
+    #drop specifies index here is income_cat then sets the way you want to drop row or columnar (0 = drop rows by index  1= drop column by labels)
+    #inplace accepts bool (True or False), default is False Inplace makes changes then & there. don’t need to assign a variable.
+    # more info https://pythonguides.com/pandas-drop/
+    
+housing = strat_train_set.copy()
+#copy the strat_test_set
+
+housing.plot(kind="scatter", x="longitude", y="latitude")
+save_fig("bad_visualization_plot")
+
+housing.plot(kind="scatter", x="longitude", y="latitude", alpha = 0.3)
+#setting alpha to 0.1 makes it much easier to visualize high density areas alpha makes the dots more transparent
+
+
+housing.plot(kind="scatter", x="longitude", y="latitude", alpha = 0.3, 
+             s=housing["population"]/100, label="population", figsize=(10,6),
+             c="median_house_value", cmap=plt.get_cmap("jet"), colorbar=True,
+             sharex=False)
+plt.legend()
+save_fig("housing_prices_scatterplot")
+#radius of each circle is a districts population (option s) and the color represnets the price
+#red is high and green is low set by the colormap (cmap = jet which is a predefined color set)
+#based on tthis you can see that it has many cluster especially in proximity ot the ocean and pop density
+#likely wnat to use a clustering algorithm to detect the main clusters and add a new feature to detecxt the proximity
+#to cluster center.
+
+# Download the California image
+images_path = os.path.join(PROJECT_ROOT_DIR, "images", "end_to_end_project")
+os.makedirs(images_path, exist_ok=True)
+DOWNLOAD_ROOT = "https://raw.githubusercontent.com/ageron/handson-ml2/master/"
+filename = "california.png"
+print("Downloading", filename)
+url = DOWNLOAD_ROOT + "images/end_to_end_project/" + filename
+urllib.request.urlretrieve(url, os.path.join(images_path, filename))
+
+import matplotlib.image as mpimg
+california_img=mpimg.imread(os.path.join(images_path, filename))
+ax = housing.plot(kind="scatter", x="longitude", y="latitude", figsize=(10,7),
+                  s=housing['population']/100, label="Population",
+                  c="median_house_value", cmap=plt.get_cmap("jet"),
+                  colorbar=False, alpha=0.4)
+plt.imshow(california_img, extent=[-124.55, -113.80, 32.45, 42.05], alpha=0.5,
+           cmap=plt.get_cmap("jet"))
+#imshow shows the data as an image on a 2D regu lar raster. This is for the california image
+plt.ylabel("Latitude", fontsize=14)
+plt.xlabel("Longitude", fontsize=14)
+
+prices = housing["median_house_value"]
+tick_values = np.linspace(prices.min(), prices.max(), 11)
+cbar = plt.colorbar(ticks=tick_values/prices.max())
+cbar.ax.set_yticklabels(["$%dk"%(round(v/1000)) for v in tick_values], fontsize=14)
+cbar.set_label('Median House Value', fontsize=16)
+
+plt.legend(fontsize=16)
+save_fig("california_housing_prices_plot")
+plt.show()
+
+#%%
+# Correlation matrix
+
+corr_matrix = housing.corr()
+corr_matrix["median_house_value"].sort_values(ascending=False)
+#pick off the corr values for the madiam house value column remem 1 is strongly positively correlated and -1 is strongly neatively correlated
+
+
+
+# from pandas.tools.plotting import scatter_matrix # For older versions of Pandas
+from pandas.plotting import scatter_matrix
+
+attributes = ["median_house_value", "median_income", "total_rooms",
+              "housing_median_age"]
+scatter_matrix(housing[attributes], figsize=(12, 8))
+#scattermatrix lets you look at the scatter matrix of correlations for a dataset given certain attirutes def above
+save_fig("scatter_matrix_plot")
+#looks like there are acouple coorelations in the scatter matrix
+
+housing.plot(kind='scatter', x='median_income', y='median_house_value', alpha=0.1)
+plt.axis([0,16,0,550000])
+save_fig("income_vs_house_value_scatterplot")
+#there is a pretty strong correlation here
+
+#playing with the data
+housing["rooms_per_household"] = housing["total_rooms"]/housing["households"]
+housing["bedrooms_per_room"] = housing["total_bedrooms"]/housing["total_rooms"]
+housing["population_per_household"]=housing["population"]/housing["households"]
+
+corr_matrix = housing.corr()
+print(corr_matrix['median_house_value'].sort_values(ascending=False))
+
+housing = strat_train_set.drop('median_house_value', axis = 1) #drops labels for the trianing set
+#we want to separtae the predictors and lables as we don't necessarily want to apply th same transformations to both
+#predictors and target values
+#.drop creates a copy of the data and does not impactstrat_train_set
+housing_labels = strat_train_set['median_house_value'].copy
+
+#%%
+#time to clean the data above the total_bedrooms attibute has some missing values so we need to fix this
+#can either
+sample_incomplete_rows = housing[housing.isnull().any(axis=1)].head()
+#axis = 1 means columns and axis = 0 means rows
+print(sample_incomplete_rows)
+
+#1 get rid or the corresponding districts
+sample_incomplete_rows.dropna(subset=["total_bedrooms"])
+
+#dropna https://www.w3schools.com/python/pandas/ref_df_dropna.asp#:~:text=Definition%20and%20Usage%20The%20dropna%20%28%29%20method%20removes,does%20the%20removing%20in%20the%20original%20DataFrame%20instead.
+
+#2 get rid of the whole attribute
+sample_incomplete_rows.drop("total_bedrooms", axis = 1)
+print(sample_incomplete_rows)
+
+
+#3 set the values to some value (nomrally 0, mean or median as appropriate)
+median = housing["total_bedrooms"].median()
+sample_incomplete_rows["total_bedrooms"].fillna(median, inplace = True)
+#fillna https://www.w3schools.com/python/pandas/ref_df_fillna.asp
+#this median would also need to go in the test set as it was used in the train set.
+print(sample_incomplete_rows)
+
+#sklearn also has a useful imputer function that works nicely to impute the values wanted to fill like median above
+
+from sklearn.impute import SimpleImputer
+imputer = SimpleImputer(strategy="median")
+
+#can only work on numerical vlaues first we drop the column
+# later can reassign the str values to a int value
+
+housing_num = housing.drop("ocean_proximity", axis = 1) #make a copy of the dat without the str prox to ocean
+imputer.fit(housing_num)
+
+a = imputer.statistics_
+#store the imputer value for each column in the statistics_ array
+b = housing_num.median().values #check it matches
+#The transform() method allows you to execute a function for each value of the DataFrame.
+
+X=imputer.transform(housing_num)
+#this runs through the data set and puts the values foudn by the imputer that is trained
+#in each empty space corresponding to the coumn it is found in. Essetiallt it is multiplied across but is 1 unless empty
+#https://www.analyticsvidhya.com/blog/2021/04/sklearn-objects-fit-vs-transform-vs-fit_transform-vs-predict-in-scikit-learn/#:~:text=fit%20%28%29%20%E2%80%93%20It%20is%20used%20for%20calculating,%28standard%20deviation%29%20and%20saves%20them%20as%20internal%20objects.
+housing_tr = pd.DataFrame(X, columns = housing_num.columns)
+#https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html
+
+#putting the prox to ocean back in
+
+housing_cat = housing["ocean_proximity"]
+
+housing_cat.head(10)
+
+#toi convert to numerical catagories uses pd factorize
+
+housing_cat_encoded, housing_catagories = housing_cat.factorize()
+housing_cat_encoded[:10]
+
+#one hot encoding is a solution to the issue that the ML program will assume closer numbers are similar which is not necessarily true
+#one hot encoding makes on varible 1 and the rest 0 so you make a column of one parameter and the aprameter is 1 and the rest are 0 and do this for all parameters
+
+from sklearn.preprocessing import OneHotEncoder
+
+cat_encoder = OneHotEncoder()
+housing_cat_1hot = cat_encoder.fit_transform(housing_cat_encoded.reshape(-1,1))
+print(housing_cat_1hot)
+#this will save space and make it a sparse matrix but can be converted to a dense matrix below 
+
+housing_cat_1hot.toarray()
+
+#if you dont want sparse at all then you can set it to false in the method
+cat_encoder = OneHotEncoder(sparse=False)
+housing_cat_1hot = cat_encoder.fit_transform(housing_cat_encoded.reshape(-1,1))
+print(housing_cat_1hot)
+
+#reshape() array makes it so you can change the dimensionakity (#rows,#cols) or (# matricies, #rows, #cols)
+#https://towardsdatascience.com/np-reshape-in-python-39b4636d7d91#:~:text=%20np.reshape%20in%20python%20%201%20Intro.%20Because,unroll%20the%20array%20to%20a%20straight...%20More%20
+
+
+#We can use -1 in a shape in np.reshape. -1 Is a placeholder and automatically 
+#takes the right value so that the input and output shapes end up matching. 
+#This is especially helpful if we write a function and we don’t know the exact 
+#dimensions of the input array are, but we know for example, that the output 
+#should have 2 columns.
+#ex:(-1,2) knows we need 2 cols and python will figure out number rows 
+
+#now to build our own custom transformer (sciKit has a bunch of useful ones but sometiomes we will need to make our own)
+# need tim implemetn 3 methods to the class fit() (returning self) ,transform(), and fit transform()
+
+#%%
+#example
+
+from sklearn.base import BaseEstimator, TransformerMixin
+
+# column index hard coded
+#rooms_ix, bedrooms_ix, population_ix, households_ix = 3, 4, 5, 6
+
+#for a cleaner solution can make it find the columns this way.
+col_names = "total_rooms", "total_bedrooms", "population", "households"
+rooms_ix, bedrooms_ix, population_ix, households_ix = [
+    housing.columns.get_loc(c) for c in col_names] # get the column indices
+#this easily allows us to iterate through the data set and get the location (loc) of each item in col_names
+
+class CombinedAttributesAdder(BaseEstimator, TransformerMixin):
+    def __init__(self, add_bedrooms_per_room = True): # no *args or **kargs
+        self.add_bedrooms_per_room = add_bedrooms_per_room
+        #this is the hyper parameter of this could add more to automate others
+        #want ot set them up here in the init and then define what they do in the transform
+    def fit(self, X, y=None):
+        return self #nothing else needed here
+    def transform(self, X):
+        rooms_per_household = X[:, rooms_ix] / X[:, households_ix]
+        #this calculates all rows X[:] in the dataset X and then sequentially divides
+        #the values in rows of the same indices for columns rooms_ix  / households_ix
+        population_per_household = X[:, population_ix] / X[:, households_ix]
+        if self.add_bedrooms_per_room:
+            bedrooms_per_room = X[:, bedrooms_ix] / X[:, rooms_ix]
+            return np.c_[X, rooms_per_household, population_per_household, bedrooms_per_room]
+            #this last line constructs a data set with the existing dataset and 
+            #calauclated columns  rooms_per_household, population_per_household, bedrooms_per_room
+            #concatenated to the end
+            #https://numpy.org/doc/stable/reference/generated/numpy.c_.html
+            #https://numpy.org/doc/stable/reference/arrays.indexing.html
+        
+        else:
+            return np.c_[X, rooms_per_household, population_per_household]
+            #if this triggeers it means that we wouldn't calcualte add_bedrooms_per_room 
+            #so there is nothing to append in that column
+        
+        
+attr_adder = CombinedAttributesAdder(add_bedrooms_per_room=False)
+#uses created class to make the data set without the bedrooms per room
+housing_extra_attribs = attr_adder.transform(housing.values)
+#transforms the data set to calculate the rooms_per_household, population_per_household since add_bedrooms_per_room=False
+#this also makes the dataframe without columns and indices 
+
+housing_extra_attribs = pd.DataFrame(
+    housing_extra_attribs,
+    #puts data in the data from the function above using our created class
+    columns=list(housing.columns)+["rooms_per_household", "population_per_household"],
+    #put the columns back in using the previous columns plus the new ones
+    index=housing.index)
+    #puts the indices back in
+#this add the labels back to the data frame by taking the column names at each column index housing anbd then add the added column headers 
+#since scikit will rmove them and adds the same indices as before in housing with index=housing.index in the dataframe. 
+
+housing_extra_attribs.head()   
+
+
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+
+num_pipeline = Pipeline([
+        ('imputer', SimpleImputer(strategy="median")),
+        ('attribs_adder', CombinedAttributesAdder()),
+        ('std_scaler', StandardScaler()),
+    ])
+
+#Pipeline constructor takes a list of names/estimator pars definig a sequence
+#All but the last estimator must be a transformer (must have fit_transform method)
+#the last can be an estimator or transformer (if just an estimator it will just call fit) if it is a transformer it will call fit_transform
+#names can be anything you like but can't have double underscores
+# the pipeline will call fit_transform for all step in the pipeline but the last one
+#the last step will have jsut fit called
+#becasue the last step in std_scaler is a transformer it will transform the data in sequence
+#if it wasn't a transformer and just an estimator it would have just called fit()
+
+
+#You can't call a transform method on a pipeline which contains
+#Non-transformer on last step. If you wan't to call transfrom on such pipeline
+# last estimator must be a transformer.
+
+
+#List of (name, transform) tuples (implementing fit/transform) that are chained, 
+#in the order in which they are chained, with the last object an estimator
+#https://scikit-learn.org/stable/modules/generated/sklearn.pipeline.Pipeline.html
+housing_num_tr = num_pipeline.fit_transform(housing_num)
+
+#if you want to use catagorical and numerical information. You will need to make the 
+# cat data one hot encoded sklearn provides a Column transformer tool to do this. 
+
+from sklearn.compose import ColumnTransformer
+
+num_attribs = list(housing_num)
+cat_attribs = ["ocean_proximity"]
+
+full_pipeline = ColumnTransformer([
+    ("num", num_pipeline, num_attribs),
+    ("cat", OneHotEncoder(), cat_attribs)
+    ])
+#for the column transformer you need to specify the encoded column "num", then it specifies the 
+#transformer/pipeline, and then sets the columns the transformer operates on/looks for like num_attributes or cat_attribute
+
+# transformers : list of tuples
+#     List of (name, transformer, columns) tuples specifying the
+#     transformer objects to be applied to subsets of the data.
+
+#     name : str
+#         Like in Pipeline and FeatureUnion, this allows the transformer and
+#         its parameters to be set using ``set_params`` and searched in grid
+#         search.
+#     transformer : {'drop', 'passthrough'} or estimator
+#         Estimator must support :term:`fit` and :term:`transform`.
+#         Special-cased strings 'drop' and 'passthrough' are accepted as
+#         well, to indicate to drop the columns or to pass them through
+#         untransformed, respectively.
+#     columns :  str, array-like of str, int, array-like of int,                 array-like of bool, slice or callable
+#         Indexes the data on its second axis. Integers are interpreted as
+#         positional columns, while strings can reference DataFrame columns
+#         by name.  A scalar string or int should be used where
+#         ``transformer`` expects X to be a 1d array-like (vector),
+#         otherwise a 2d array will be passed to the transformer.
+#         A callable is passed the input data `X` and can return any of the
+#         above. To select multiple columns by name or dtype, you can use
+#         :obj:`make_column_selector`.
+
+housing_prepared = full_pipeline.fit_transform(housing)
+#this no takes the data in housing and tranforms it based on the pipeline
+#for the numerical attributes it run num pipeline to standardize looking for the column headers in num_attributes
+#for the catagorical data in column specifed in cat_attribute in the table housing and uses one hot encoder to make it a one hot encoder list
+
+#%% notes
+# Column transformer makse it so we can do both the catagorical and numerical cloumns together.
+# there is an older version that does this as well but i more extensive.
+
+
+# from sklearn.base import BaseEstimator, TransformerMixin
+
+# # Create a class to select numerical or categorical columns 
+# class OldDataFrameSelector(BaseEstimator, TransformerMixin):
+#     def __init__(self, attribute_names):
+#         self.attribute_names = attribute_names
+#     def fit(self, X, y=None):
+#         return self
+#     def transform(self, X):
+#         return X[self.attribute_names].values
+
+
+# num_attribs = list(housing_num)
+# cat_attribs = ["ocean_proximity"]
+
+# old_num_pipeline = Pipeline([
+#         ('selector', OldDataFrameSelector(num_attribs)),
+#         ('imputer', SimpleImputer(strategy="median")),
+#         ('attribs_adder', CombinedAttributesAdder()),
+#         ('std_scaler', StandardScaler()),
+#     ])
+
+# old_cat_pipeline = Pipeline([
+#         ('selector', OldDataFrameSelector(cat_attribs)),
+#         ('cat_encoder', OneHotEncoder(sparse=False)),
+#     ])
+
+# from sklearn.pipeline import FeatureUnion
+
+# old_full_pipeline = FeatureUnion(transformer_list=[
+#         ("num_pipeline", old_num_pipeline),
+#         ("cat_pipeline", old_cat_pipeline),
+#     ])
+
+
+# old_housing_prepared = old_full_pipeline.fit_transform(housing)
+
+
+# np.allclose(housing_prepared, old_housing_prepared)
+#%%
+
+# We did it now we can actually train the model
+#Steps to take : look at the data, split the data, see if you can find any correlations, clean and prepare the data
+
+from sklearn.linear_model import LinearRegression
+
+housing_labels = strat_train_set["median_house_value"].copy()
+lin_reg = LinearRegression()
+lin_reg.fit(housing_prepared, housing_labels)
+#trains the model setting housing preoared with the full pipeline in X and
+#the labels (median house value in y)
+
+some_data = housing.iloc[:20]
+#grab rows 0-4 of the predicted values of median house value
+some_labels = housing_labels.iloc[:20]
+#grab rows 0-4 of labelled (actual) median house value
+some_data_prepared = full_pipeline.transform(some_data)
+#run the full pipeline on some data
+#%% notes
+# loc is label-based, which means that we have to specify the name of the rows and columns that we need to filter out.
+
+# On the other hand, iloc is integer index-based. So here, we have to specify rows and columns by their integer index.
+#https://www.analyticsvidhya.com/blog/2020/02/loc-iloc-pandas/#:~:text=So%2C%20we%20can%20filter%20the%20data%20using%20the,the%20rows%20with%20index%201%2C%202%20or%20100.
+
+#loc starts with labels on columns and then can specify conditions to select certain rows/columns
+#data.loc[1:3] slices data for indexes 1-3
+
+#data.loc[(data.age >= 12), ['section']] = 'M' selects data in column age for all>=12 
+#then says in column section all that satisfy the precious age constraint are labelled 
+# M
+
+#data.loc[(data.age >= 20), ['section', 'city']] = ['S','Pune'] same as above but two labells 
+#selected and now they will label section = s  and city = pune that satisfy the condition
+
+
+
+#iloc starts with selecting certain rows indices and then can select columns by sliceing certain locations
+#data.iloc[[0,2],[1,3]] selects only indices 0,2 and rows 1,3
+#data.iloc[1:3,2:4] gives rows 1-2 and columns 2-3
+#%%
+print("Predictions:", lin_reg.predict(some_data_prepared))
+#this gives us the predicted values for the first 5 data points of the linear regression
+#it is still pretty far off though
+
+print("Labels:", list(some_labels))
+
+
+from sklearn.metrics import mean_squared_error
+
+housing_predictions = lin_reg.predict(housing_prepared)
+#look at RMSE of the whole training set that was used to train the model
+#%% notes
+# lin_mse = mean_squared_error(housing_labels, housing_predictions)
+# lin_rmse = np.sqrt(lin_mse)
+# lin_rmse
+#or
+#%%
+lin_rmse = mean_squared_error(housing_labels, housing_predictions, squared=False)
+lin_rmse
+#RMSE of the predcited model is about 68,000$ off from the label
+#so this means we either need a better model, feed the model better features,
+# or reduce constraints (not the case here since it isnt regularized so hyperparameter 
+#constraint isn't an issue here)
+#before adding more feature (more work for us) lets try a better model (more work for python)
+
+#Decision tree regressor
+
+from sklearn.tree import DecisionTreeRegressor
+
+tree_reg = DecisionTreeRegressor()
+tree_reg.fit(housing_prepared, housing_labels)
+
+housing_predictions = tree_reg.predict(housing_prepared)
+tree_rmse = mean_squared_error(housing_labels, housing_predictions, squared=False)
+print(tree_rmse)
+
+#prefect RMSE but this is hella overfitted
+#dont touch the test set until you are ready to launch the model and htis one isn't ready
+#%% notes
+#one way to evaluste would be to split the test data set withg train_test_split to splity it intoa smaller traioning set and evalutae vs the validation set
+#this one is a bit of work
+#alternatively and much fast we can use the cross validation feature to do a k fold cross validation
+# this will take the data set and randomly split the model into 10 sub sets called folds (can do more/less if wanted)
+#these folds are then evasluted and scored. the next fold is trained form the last to try to improve the score
+#likely 10 will be too many but can be adjusted as needed
+#this uses a utuility function that says greater is better. (opposite of lower is better in rmse)
+
+#https://towardsdatascience.com/cross-validation-explained-evaluating-estimator-performance-e51e5430ff85#:~:text=The%20procedure%20has%20a%20single%20parameter%20called%20k,the%20model%2C%20such%20as%20k%3D10%20becoming%2010-fold%20cross-validation.
+#%%
+
+from sklearn.model_selection import cross_val_score
+
+scores = cross_val_score(tree_reg, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+
+#this method uses 
+#Estimator = thin that fit is used on here it is the tree regression we just did, X dataset = housing prepared, Y data set = housing_labels
+#scoring= some way we score the function here it is neg mse options are here: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter
+#cv=number of folds default is 5 
+
+rmse_scores = np.sqrt(-scores)
+#use -scores since we are using -MSE for socring in function above
+
+def display_scores(scores):
+    print("Scores:", scores)
+    print("Mean:", scores.mean())
+    print("Standard deviation:", scores.std())
+
+display_scores(rmse_scores)
+
+#shows we were defintely over fitting
+
+lin_scores =  cross_val_score(lin_reg, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+
+lin_rmse = np.sqrt(-lin_scores)
+
+display_scores(lin_rmse)
+
+#linear model is actually doing better
+
+from sklearn.ensemble import RandomForestRegressor
+
+forest_reg = RandomForestRegressor(n_estimators=100, random_state=42)
+
+forest_reg.fit(housing_prepared, housing_labels)
+
+tree_scores = cross_val_score(forest_reg, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+
+tree_rmse = np.sqrt(-tree_scores)
+
+display_scores(tree_rmse)
+
+#%% can use this to save the models so you don't have to run them again
+import pickle
+from joblib import dump, load
+dump(forest_reg, "forest_reg.joblib")
+
+forest_reg = load("forest_reg.joblib")
+#%% svm testing
+#this is better but still is preciting too low. Next step would be to try other models
+#always have a short list of models before tweaking hyper parameters.
+
+scores = cross_val_score(lin_reg, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+pd.Series(np.sqrt(-scores)).describe()
+
+from sklearn.svm import SVR
+#svm machine using support vector regression
+#https://scikit-learn.org/stable/modules/svm.html#svm-implementation-details
+lin_svm_reg = SVR(kernel="linear")
+#need to set the kernel for the ype of SVM
+lin_svm_reg.fit(housing_prepared, housing_labels)
+housing_predictions = lin_svm_reg.predict(housing_prepared)
+svm_mse = mean_squared_error(housing_labels, housing_predictions)
+svm_rmse = np.sqrt(svm_mse)
+display_scores(svm_rmse)
+
+lin_svm_scores = cross_val_score(lin_svm_reg, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+pd.Series(np.sqrt(-lin_svm_scores)).describe()
+#this is worse than linear
+
+
+poly_svm_reg = SVR(kernel="poly")
+#need to set the kernel for the ype of SVM
+poly_svm_reg.fit(housing_prepared, housing_labels)
+housing_predictions = poly_svm_reg.predict(housing_prepared)
+poly_mse = mean_squared_error(housing_labels, housing_predictions)
+poly_rmse = np.sqrt(poly_mse)
+display_scores(poly_rmse)
+
+lin_svm_scores = cross_val_score(poly_svm_reg, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+pd.Series(np.sqrt(-lin_svm_scores)).describe()
+
+
+from sklearn.model_selection import GridSearchCV
+
+param_grid = [
+        {'kernel': ['linear'], 'C': [10., 30., 100., 300., 1000., 3000., 10000., 30000.0]},
+        {'kernel': ['rbf'], 'C': [1.0, 3.0, 10., 30., 100., 300., 1000.0],
+         'gamma': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0]},
+    ]
+
+svm_reg = SVR()
+grid_search = GridSearchCV(svm_reg, param_grid, cv=5, scoring='neg_mean_squared_error', verbose=2)
+grid_search.fit(housing_prepared, housing_labels)
+
+negative_mse = grid_search.best_score_
+rmse = np.sqrt(-negative_mse)
+
+grid_search.best_params_
+
+
+from sklearn.model_selection import RandomizedSearchCV
+from scipy.stats import expon, reciprocal
+
+# see https://docs.scipy.org/doc/scipy/reference/stats.html
+# for `expon()` and `reciprocal()` documentation and more probability distribution functions.
+
+# Note: gamma is ignored when kernel is "linear"
+param_distribs = {
+        'kernel': ['linear', 'rbf'],
+        'C': reciprocal(20, 200000),
+        'gamma': expon(scale=1.0),
+    }
+
+svm_reg = SVR()
+rnd_search = RandomizedSearchCV(svm_reg, param_distributions=param_distribs,
+                                n_iter=50, cv=5, scoring='neg_mean_squared_error',
+                                verbose=2, random_state=42)
+rnd_search.fit(housing_prepared, housing_labels)
+
+
+negative_mse = rnd_search.best_score_
+rmse = np.sqrt(-negative_mse)
+
+rnd_search.best_params_
+
+expon_distrib = expon(scale=1.)
+samples = expon_distrib.rvs(10000, random_state=42)
+plt.figure(figsize=(10, 4))
+plt.subplot(121)
+plt.title("Exponential distribution (scale=1.0)")
+plt.hist(samples, bins=50)
+plt.subplot(122)
+plt.title("Log of this distribution")
+plt.hist(np.log(samples), bins=50)
+plt.show()
+
+#The distribution we used for C looks quite different: the scale of the samples is picked from a uniform distribution within a given range, which is why the right graph, which represents the log of the samples, looks roughly constant. This distribution is useful when you don't have a clue of what the target scale is:
+    
+reciprocal_distrib = reciprocal(20, 200000)
+samples = reciprocal_distrib.rvs(10000, random_state=42)
+plt.figure(figsize=(10, 4))
+plt.subplot(121)
+plt.title("Reciprocal distribution (scale=1.0)")
+plt.hist(samples, bins=50)
+plt.subplot(122)
+plt.title("Log of this distribution")
+plt.hist(np.log(samples), bins=50)
+plt.show()
+
+#The reciprocal distribution is useful when you have no idea what the scale of the hyperparameter should be (indeed, as you can see on the figure on the right, all scales are equally likely, within the given range), whereas the exponential distribution is best when you know (more or less) what the scale of the hyperparameter should be.
+
+
+
+#say we have a short list of models here we will just use thew forest since that is our best bet
+#we can tune the hyper parameters either manually (this is inefficeint and generally a waste of time at least at first)
+#or we cna use a grid search to find more optimal choices
+#%%
+#%% gridsearch section
+from sklearn.model_selection import GridSearchCV
+
+param_grid = [
+    # try 12 (3×4) combinations of hyperparameters N ESTIMATORS AND MAX_FEATURES
+    {'n_estimators': [3, 10, 30], 'max_features': [2, 4, 6, 8]},
+    # then try 6 (2×3) combinations with bootstrap set as False (TRUE IS DEFAULT)
+    #NEXT DICT AFTER THE BOOTSTRAP 
+    {'bootstrap': [False], 'n_estimators': [3, 10], 'max_features': [2, 3, 4]},
+  ]
+#this will give a grid search of 12+6 random forest regressors hyperparameters
+
+forest_reg = RandomForestRegressor(random_state=42)
+# train across 5 (cv below) folds, that's a total of (12+6)*5=90 rounds of training 
+grid_search = GridSearchCV(forest_reg, param_grid, cv=5,
+                           scoring='neg_mean_squared_error',
+                           return_train_score=True)
+#grid search needs parameters model (forest_reg), parameter gird or set of parameters (easier to build a parameter grid of dicts)
+#scoring method and If return train scores is False, the cv_results_ attribute will not include training scores. 
+#https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
+
+grid_search.fit(housing_prepared, housing_labels)
+#runs the gridsearch
+
+grid_search.best_params_
+
+grid_search.best_estimator_
+cvres = grid_search.cv_results_
+for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
+    print(np.sqrt(-mean_score), params)
+cv_df = pd.DataFrame(grid_search.cv_results_)
+
+
+# forest_reg = RandomForestRegressor(n_estimators=30, max_features = 8, random_state=42)
+
+# forest_reg.fit(housing_prepared, housing_labels)
+
+
+tree_scores = cross_val_score(grid_search.best_estimator_, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+
+tree_rmse = np.sqrt(-tree_scores)
+
+display_scores(tree_rmse)
+
+#with the hyper parameters here we have improved the stdev and RMSE
+#%% Grid search is useful if you are exploring relatively few combinations
+#if the search space is large it is oftern preferential to use the ranom search CV instead
+# instead of doing all combinations it uses a given number of random combinations by selecting a 
+#random values for the parameter at each iteration
+
+from sklearn.model_selection import RandomizedSearchCV
+from scipy.stats import randint
+
+param_distribs = {
+        'n_estimators': randint(low=1, high=200),
+        'max_features': randint(low=1, high=8),
+    }
+
+forest_reg = RandomForestRegressor(random_state=42)
+rnd_search = RandomizedSearchCV(forest_reg, param_distributions=param_distribs,
+                                n_iter=10, cv=5, scoring='neg_mean_squared_error', random_state=42)
+rnd_search.fit(housing_prepared, housing_labels)
+
+#param_dsitributions is similar to the param grid above but it is givinh a range not specific parametes to try
+#https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html
+
+rnd_search.best_params_
+
+rnd_search.best_estimator_
+
+cvres = rnd_search.cv_results_
+for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
+    print(np.sqrt(-mean_score), params)
+    
+tree_scores = cross_val_score(rnd_search.best_estimator_, housing_prepared, housing_labels, scoring="neg_mean_squared_error", cv=10)
+
+tree_rmse = np.sqrt(-tree_scores)
+
+display_scores(tree_rmse)
+
+feature_importances = grid_search.best_estimator_.feature_importances_
+print(feature_importances)
+
+
+extra_attribs = ["rooms_per_hhold", "pop_per_hhold", "bedrooms_per_room"]
+#cat_encoder = cat_pipeline.named_steps["cat_encoder"] # old solution
+cat_encoder = full_pipeline.named_transformers_["cat"]
+#accesses the cat transormer of the full pipeline 
+#full_pipeline = ColumnTransformer([
+#     ("num", num_pipeline, num_attribs),
+#     ("cat", OneHotEncoder(), cat_attribs)
+#     ])
+cat_one_hot_attribs = list(cat_encoder.categories_[0])
+attributes = num_attribs + extra_attribs + cat_one_hot_attribs
+sorted(zip(feature_importances, attributes), reverse=True)
+
+
+#%%
+#eval on the test set
+final_model = grid_search.best_estimator_
+
+X_test = strat_test_set.drop("median_house_value", axis=1) #1 for columns
+y_test = strat_test_set["median_house_value"].copy()
+
+X_test_prepared = full_pipeline.transform(X_test)
+final_predictions = final_model.predict(X_test_prepared)
+
+final_mse = mean_squared_error(y_test, final_predictions)
+final_rmse = np.sqrt(final_mse)
+
+#%% questions
+from sklearn.model_selection import GridSearchCV
+
+param_grid = [
+        {'kernel': ['linear'], 'C': [10., 30., 100., 300., 1000., 3000., 10000., 30000.0]},
+        {'kernel': ['rbf'], 'C': [1.0, 3.0, 10., 30., 100., 300., 1000.0],
+         'gamma': [0.01, 0.03, 0.1, 0.3, 1.0, 3.0]},
+    ]
+
+svm_reg = SVR()
+grid_search = GridSearchCV(svm_reg, param_grid, cv=5, scoring='neg_mean_squared_error', verbose=2)
+grid_search.fit(housing_prepared, housing_labels)
+
+negative_mse = grid_search.best_score_
+rmse = np.sqrt(-negative_mse)
+
+grid_search.best_params_
+
+
+from sklearn.model_selection import RandomizedSearchCV
+from scipy.stats import expon, reciprocal
+
+# see https://docs.scipy.org/doc/scipy/reference/stats.html
+# for `expon()` and `reciprocal()` documentation and more probability distribution functions.
+
+# Note: gamma is ignored when kernel is "linear"
+param_distribs = {
+        'kernel': ['linear', 'rbf'],
+        'C': reciprocal(20, 200000),
+        'gamma': expon(scale=1.0),
+    }
+
+svm_reg = SVR()
+rnd_search = RandomizedSearchCV(svm_reg, param_distributions=param_distribs,
+                                n_iter=50, cv=5, scoring='neg_mean_squared_error',
+                                verbose=2, random_state=42)
+rnd_search.fit(housing_prepared, housing_labels)
+
+
+negative_mse = rnd_search.best_score_
+rmse = np.sqrt(-negative_mse)
+
+rnd_search.best_params_
+
+expon_distrib = expon(scale=1.)
+samples = expon_distrib.rvs(10000, random_state=42)
+plt.figure(figsize=(10, 4))
+plt.subplot(121)
+plt.title("Exponential distribution (scale=1.0)")
+plt.hist(samples, bins=50)
+plt.subplot(122)
+plt.title("Log of this distribution")
+plt.hist(np.log(samples), bins=50)
+plt.show()
+
+#The distribution we used for C looks quite different: the scale of the samples is picked from a uniform distribution within a given range, which is why the right graph, which represents the log of the samples, looks roughly constant. This distribution is useful when you don't have a clue of what the target scale is:
+    
+reciprocal_distrib = reciprocal(20, 200000)
+samples = reciprocal_distrib.rvs(10000, random_state=42)
+plt.figure(figsize=(10, 4))
+plt.subplot(121)
+plt.title("Reciprocal distribution (scale=1.0)")
+plt.hist(samples, bins=50)
+plt.subplot(122)
+plt.title("Log of this distribution")
+plt.hist(np.log(samples), bins=50)
+plt.show()
+
+
+
+from sklearn.base import BaseEstimator, TransformerMixin
+
+def indices_of_top_k(arr, k):
+    return np.sort(np.argpartition(np.array(arr), -k)[-k:])
+
+class TopFeatureSelector(BaseEstimator, TransformerMixin):
+    def __init__(self, feature_importances, k):
+        self.feature_importances = feature_importances
+        self.k = k
+    def fit(self, X, y=None):
+        self.feature_indices_ = indices_of_top_k(self.feature_importances, self.k)
+        return self
+    def transform(self, X):
+        return X[:, self.feature_indices_]
+    
+k=5
+    
+
+top_k_feature_indices = indices_of_top_k(feature_importances, k)
+
+
+
+
+np.array(attributes)[top_k_feature_indices]
+
+sorted(zip(feature_importances, attributes), reverse=True)[:k]
+
+
+preparation_and_feature_selection_pipeline = Pipeline([
+    ('preparation', full_pipeline),
+    ('feature_selection', TopFeatureSelector(feature_importances, k))
+])
+
+housing_prepared_top_k_features = preparation_and_feature_selection_pipeline.fit_transform(housing)
+
+
+housing_prepared_top_k_features[0:3]
+
+housing_prepared[0:3, top_k_feature_indices]
